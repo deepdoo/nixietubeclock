@@ -1,0 +1,86 @@
+#include <Wire.h>
+
+#define RX8900A_ADRS           0x32
+
+#define MIN_reg                0x01
+#define HOUR_reg               0x02
+#define Control_Register_reg   0x0F
+const int buttonHour = 4;
+const int buttonMin = 9;
+
+uint8_t MIN     = 0x00;
+uint8_t HOUR    = 0x00;
+
+byte ham[] = {2,1,0,9,8,7,6,5,4,3};
+byte mam[] = {9,0,1,2,3,4,5,6,7,8};
+
+// 74141 DCBA
+byte ha1[] = {14,16,17,15};
+byte ha2[] = {10,12,13,11};
+byte ma1[] = {1,3,0,2};
+byte ma2[] = {5,8,6,7};
+uint8_t h,m;
+
+void setup() {
+  delay(150);
+  Wire.begin();
+  for(int i = 0; i<= 17; i++) {
+    pinMode(i, OUTPUT);
+  }
+  pinMode(buttonHour, INPUT_PULLUP);
+  pinMode(buttonMin, INPUT_PULLUP);
+  // self test
+  delay(2000);
+  for(int i=0;i<10;i++) {
+    delay(500);
+    d2b(ha1, ham[i]);
+    d2b(ha2, ham[i]);
+    d2b(ma1, mam[i]);
+    d2b(ma2, mam[i]);
+  }
+}
+
+void loop() {
+  delay(200);
+  RegisterRead();
+  if(HOUR!=h){
+    h = HOUR;
+    d2b(ha1, ham[HOUR>>4]);
+    d2b(ha2, ham[HOUR&0x0F]);
+  }
+  if(MIN!=m){
+    m=MIN;
+    d2b(ma1, mam[MIN>>4]);
+    d2b(ma2, mam[MIN&0x0F]);
+  }
+  if(digitalRead(buttonHour) == LOW) {
+    uint8_t h = ((HOUR>>4)*10+(HOUR&0x0F)+1)%0x18;
+    ByteWrite(HOUR_reg,((h/10)<<4)+(h%10));
+  }
+  if(digitalRead(buttonMin) == LOW) {
+    uint8_t m = ((MIN>>4)*10+(MIN&0x0F)+1)%0x3C;
+    ByteWrite(MIN_reg,((m/10)<<4)+(m%10));
+  }
+}
+void ByteWrite(byte reg, byte data)
+{
+  Wire.beginTransmission(RX8900A_ADRS);
+  Wire.write(reg);
+  Wire.write(data);
+  Wire.endTransmission();
+}
+void RegisterRead(void)
+{
+  Wire.beginTransmission(RX8900A_ADRS);
+  Wire.write(MIN_reg);//set 0x01(MIN)Register address
+  Wire.endTransmission(false);
+  Wire.requestFrom(RX8900A_ADRS, Control_Register_reg); //set 0x0F(Control Register)Register address
+  MIN = Wire.read();                //0x01
+  HOUR = Wire.read();               //0x02
+}
+void d2b(byte a[], byte b)
+{
+  for(int x=0;x<4;x++) {
+    digitalWrite(a[x],b>>x&1);
+  }
+}
